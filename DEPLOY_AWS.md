@@ -97,12 +97,6 @@ server {
   root /var/www/lakshayindia;
   index index.html;
 
-  # Basic security headers
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header X-Frame-Options "DENY" always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-
   location /api/ {
     proxy_pass http://127.0.0.1:4000;
     proxy_http_version 1.1;
@@ -123,10 +117,6 @@ Enable:
 
 ### 8) HTTPS certificate
 - `sudo certbot --nginx -d lakshayindia.biz -d www.lakshayindia.biz`
-
-After HTTPS is working, you can enable HSTS:
-- Add this line in your nginx server block:
-  - `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`
 
 Done.
 

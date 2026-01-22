@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
-const helmet = require('helmet');
 const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -48,16 +47,6 @@ async function main() {
   const app = express();
 
   app.disable('x-powered-by');
-  // If you later deploy behind a reverse-proxy/load balancer, enable this.
-  // app.set('trust proxy', 1);
-
-  // Security headers for API responses.
-  // CSP is intentionally disabled here because the frontend is served by nginx.
-  app.use(
-    helmet({
-      contentSecurityPolicy: false,
-    })
-  );
   app.use(morgan('dev'));
   app.use(buildCors());
   app.use(express.json({ limit: '256kb' }));
