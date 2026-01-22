@@ -30,6 +30,12 @@ cd "$APP_DIR/frontend"
 npm ci
 npm run build
 
+echo "==> Publish frontend to /var/www (nginx)"
+sudo mkdir -p /var/www/lakshayindia
+sudo rsync -a --delete "$APP_DIR/frontend/dist/" /var/www/lakshayindia/
+sudo chown -R www-data:www-data /var/www/lakshayindia
+sudo chmod -R 755 /var/www/lakshayindia
+
 echo "==> Reload nginx"
 sudo systemctl reload nginx
 
