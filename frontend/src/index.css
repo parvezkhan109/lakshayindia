@@ -1,0 +1,247 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 240 5.9% 10%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 10% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@keyframes li-marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes li-float {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -8px, 0); }
+}
+
+@keyframes li-float2 {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-1deg); }
+  50% { transform: translate3d(0, -6px, 0) rotate(1deg); }
+}
+
+@keyframes li-spinSlow {
+  0% { transform: translate3d(-50%, 0, 0) rotate(0deg); }
+  100% { transform: translate3d(-50%, 0, 0) rotate(360deg); }
+}
+
+@keyframes li-glowPulse {
+  0%, 100% { filter: blur(0px); opacity: 0.55; transform: scale(1); }
+  50% { filter: blur(1px); opacity: 0.85; transform: scale(1.05); }
+}
+
+@keyframes li-shimmer {
+  0% {
+    transform: translate3d(-30%, 0, 0);
+    opacity: 0.0;
+  }
+  20% {
+    opacity: 0.35;
+  }
+  60% {
+    opacity: 0.15;
+  }
+  100% {
+    transform: translate3d(130%, 0, 0);
+    opacity: 0.0;
+  }
+}
+
+.li-runway {
+  perspective: 1200px;
+}
+
+.li-runwayInner {
+  transform: rotateX(14deg);
+  transform-style: preserve-3d;
+}
+
+.li-marqueeTrack {
+  width: 200%;
+  animation: li-marquee 16s linear infinite;
+  will-change: transform;
+}
+
+.li-shimmer {
+  animation: li-shimmer 2.8s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.li-float {
+  animation: li-float 3.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.li-float2 {
+  animation: li-float2 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.li-spinSlow {
+  animation: li-spinSlow 28s linear infinite;
+  will-change: transform;
+}
+
+.li-glowPulse {
+  animation: li-glowPulse 3.4s ease-in-out infinite;
+  will-change: transform, opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .li-marqueeTrack,
+  .li-shimmer {
+    animation: none;
+  }
+}
+
+@keyframes li-float {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes li-float2 {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, 12px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes li-spinSlow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes li-glowPulse {
+  0% {
+    opacity: 0.25;
+    filter: blur(28px);
+  }
+  50% {
+    opacity: 0.55;
+    filter: blur(40px);
+  }
+  100% {
+    opacity: 0.25;
+    filter: blur(28px);
+  }
+}
+
+.li-float {
+  animation: li-float 5.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.li-float2 {
+  animation: li-float2 6.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.li-spinSlow {
+  animation: li-spinSlow 22s linear infinite;
+  will-change: transform;
+}
+
+.li-glowPulse {
+  animation: li-glowPulse 3.8s ease-in-out infinite;
+  will-change: opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .li-float,
+  .li-float2,
+  .li-spinSlow,
+  .li-glowPulse {
+    animation: none;
+  }
+}

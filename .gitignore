@@ -1,0 +1,17 @@
+# Node
+node_modules/
+
+# Env
+.env
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# SQLite
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Logs
+*.log
