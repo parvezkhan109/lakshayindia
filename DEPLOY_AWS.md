@@ -81,6 +81,12 @@ Start backend:
 
 This produces `frontend/dist`.
 
+Recommended (avoid nginx permission issues + cleaner):
+- `sudo mkdir -p /var/www/lakshayindia`
+- `sudo rsync -a --delete /home/ubuntu/app/frontend/dist/ /var/www/lakshayindia/`
+- `sudo chown -R www-data:www-data /var/www/lakshayindia`
+- `sudo chmod -R 755 /var/www/lakshayindia`
+
 ### 7) Nginx config (same domain)
 Create `/etc/nginx/sites-available/lakshayindia`:
 ```nginx
@@ -88,8 +94,14 @@ server {
   listen 80;
   server_name lakshayindia.biz www.lakshayindia.biz;
 
-  root /home/ubuntu/app/frontend/dist;
+  root /var/www/lakshayindia;
   index index.html;
+
+  # Basic security headers
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Frame-Options "DENY" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
 
   location /api/ {
     proxy_pass http://127.0.0.1:4000;
@@ -111,6 +123,10 @@ Enable:
 
 ### 8) HTTPS certificate
 - `sudo certbot --nginx -d lakshayindia.biz -d www.lakshayindia.biz`
+
+After HTTPS is working, you can enable HSTS:
+- Add this line in your nginx server block:
+  - `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`
 
 Done.
 
