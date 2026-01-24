@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import LuckIndiaLogo from '@/components/LuckIndiaLogo'
 import { formatSlotLabel } from '@/lib/slots'
 import { apiFetch } from '@/services/api'
 
@@ -66,14 +67,39 @@ export default function PublicResultsPage() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="text-sm text-zinc-400">Luck India</div>
-            <h1 className="text-2xl font-semibold">{title}</h1>
+        <div className="relative overflow-hidden rounded-3xl ring-1 ring-white/10">
+          <div className="pointer-events-none absolute inset-0">
+            <img
+              src="/hero-strip.svg"
+              alt=""
+              className="h-full w-full object-cover opacity-55"
+              decoding="async"
+              loading="eager"
+              draggable={false}
+            />
+            <div className="absolute inset-0 bg-black/65 backdrop-blur-xl" />
           </div>
-          <div className="w-full max-w-xs">
-            <div className="text-xs text-zinc-400">Select date</div>
-            <Input className="mt-2 bg-zinc-950/40" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+
+          <div className="relative p-4 sm:p-5">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="flex items-end gap-4">
+                <div className="[transform:perspective(900px)_rotateX(10deg)_rotateY(-14deg)]">
+                  <LuckIndiaLogo className="h-20 w-20 sm:h-24 sm:w-24 scale-[1.55] origin-left" />
+                </div>
+                <div>
+                  <div className="text-sm sm:text-base font-semibold text-amber-300 tracking-wide">LAKSHAY INDIA</div>
+                  <div className="mt-0.5 text-[10px] sm:text-[11px] text-amber-200/90 tracking-[0.18em] uppercase">
+                    WHERE STORIES BEGIN &amp; DESTINIES ARE CHOSEN
+                  </div>
+                  <h1 className="mt-2 text-2xl font-semibold">{title}</h1>
+                </div>
+              </div>
+
+              <div className="w-full max-w-xs">
+                <div className="text-xs text-zinc-300/80">Select date</div>
+                <Input className="mt-2 bg-zinc-950/40" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              </div>
+            </div>
           </div>
         </div>
 

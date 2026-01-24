@@ -85,6 +85,15 @@ body {
   }
 }
 
+@keyframes li-marqueeUp {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(0, -50%, 0);
+  }
+}
+
 @keyframes li-float {
   0%, 100% { transform: translate3d(0, 0, 0); }
   50% { transform: translate3d(0, -8px, 0); }
@@ -137,6 +146,16 @@ body {
   will-change: transform;
 }
 
+.li-marqueeUpTrack {
+  height: 200%;
+  animation: li-marqueeUp 22s linear infinite;
+  will-change: transform;
+}
+
+.li-pauseOnHover:hover .li-marqueeUpTrack {
+  animation-play-state: paused;
+}
+
 .li-shimmer {
   animation: li-shimmer 2.8s ease-in-out infinite;
   will-change: transform, opacity;
@@ -164,6 +183,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .li-marqueeTrack,
+  .li-marqueeUpTrack,
   .li-shimmer {
     animation: none;
   }

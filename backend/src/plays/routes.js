@@ -222,9 +222,9 @@ router.get('/mine', requireAuth, (req, res) => {
 });
 
 // ADMIN: audit trail of vendor plays (who played what, for which slot, and when)
-// Query: ?date=YYYY-MM-DD&hour=0-23&vendorUserId=123&quizType=SILVER&limit=100&offset=0
+// Query: ?date=YYYY-MM-DD&hour=0-23&vendorUserId=123&vendor=rahul&quizType=SILVER&limit=100&offset=0
 router.get('/audit', requireAuth, requireRole('ADMIN'), (req, res) => {
-  const { date, hour, vendorUserId, quizType, limit, offset } = req.query;
+  const { date, hour, vendorUserId, vendor, vendorUsername, quizType, limit, offset } = req.query;
 
   const qt = quizType ? normalizeQuizType(quizType) : null;
   if (quizType && !qt) return res.status(400).json({ ok: false, error: 'Invalid quizType' });
@@ -250,6 +250,9 @@ router.get('/audit', requireAuth, requireRole('ADMIN'), (req, res) => {
   const vid = vendorUserId ? Number(vendorUserId) : null;
   if (vendorUserId && !vid) return res.status(400).json({ ok: false, error: 'Invalid vendorUserId' });
 
+  const vendorQRaw = String(vendorUsername || vendor || '').trim();
+  const vendorQ = vendorQRaw.length ? vendorQRaw : null;
+
   const limRaw = limit ? Number(limit) : 100;
   const offRaw = offset ? Number(offset) : 0;
   const lim = Number.isInteger(limRaw) ? Math.min(Math.max(limRaw, 1), 500) : 100;
@@ -270,6 +273,15 @@ router.get('/audit', requireAuth, requireRole('ADMIN'), (req, res) => {
   if (vid) {
     where.push('p.vendor_user_id = ?');
     args.push(vid);
+  }
+  if (!vid && vendorQ) {
+    if (/^\d+$/.test(vendorQ)) {
+      where.push('p.vendor_user_id = ?');
+      args.push(Number(vendorQ));
+    } else {
+      where.push('LOWER(vu.username) LIKE ?');
+      args.push(`%${vendorQ.toLowerCase()}%`);
+    }
   }
   if (qt) {
     where.push('p.quiz_type = ?');
@@ -311,12 +323,49 @@ router.get('/audit', requireAuth, requireRole('ADMIN'), (req, res) => {
     .prepare(
       `SELECT COUNT(1) AS total
        FROM plays p
+       JOIN users vu ON vu.id = p.vendor_user_id
        JOIN slots sl ON sl.id = p.slot_id
        ${whereSql}`
     )
     .get(...args);
 
   res.json({ ok: true, total: totalRow ? totalRow.total : 0, rows, limit: lim, offset: off });
+});
+
+// ADMIN: delete play audit logs by slot date range (inclusive)
+// Body: { fromDate: 'YYYY-MM-DD', toDate: 'YYYY-MM-DD' }
+router.post('/audit/delete-range', requireAuth, requireRole('ADMIN'), (req, res) => {
+  const fromDate = String(req.body?.fromDate || '').trim();
+  const toDate = String(req.body?.toDate || '').trim();
+
+  try {
+    assertDate(fromDate);
+    assertDate(toDate);
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+
+  if (fromDate > toDate) {
+    return res.status(400).json({ ok: false, error: 'fromDate must be <= toDate' });
+  }
+
+  const db = getDb();
+
+  const tx = db.transaction(() => {
+    // Delete plays for all slots in range.
+    const info = db
+      .prepare(
+        `DELETE FROM plays
+         WHERE slot_id IN (
+           SELECT id FROM slots WHERE slot_date BETWEEN ? AND ?
+         )`
+      )
+      .run(fromDate, toDate);
+    return info.changes || 0;
+  });
+
+  const deleted = tx();
+  res.json({ ok: true, deleted });
 });
 
 module.exports = router;

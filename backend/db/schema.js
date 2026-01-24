@@ -111,4 +111,28 @@ CREATE TABLE IF NOT EXISTS audit_result_publishes (
   FOREIGN KEY(slot_id) REFERENCES slots(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_audit_slot ON audit_result_publishes(slot_id);
+
+-- Public registration / contact queries (submitted from landing/register page)
+CREATE TABLE IF NOT EXISTS queries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  father_name TEXT NOT NULL,
+  dob TEXT NOT NULL,
+  permanent_address TEXT NOT NULL,
+  state TEXT NOT NULL,
+  district TEXT NOT NULL,
+  city TEXT NOT NULL,
+  contact_number TEXT NOT NULL,
+  email TEXT NOT NULL,
+  username TEXT NOT NULL,
+  password TEXT NOT NULL,
+  aadhar_card TEXT NOT NULL,
+  pan_card TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('NEW','PROCESSED')),
+  created_at TEXT NOT NULL,
+  processed_by_user_id INTEGER,
+  processed_at TEXT,
+  FOREIGN KEY(processed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_queries_status_created ON queries(status, created_at);
 `;

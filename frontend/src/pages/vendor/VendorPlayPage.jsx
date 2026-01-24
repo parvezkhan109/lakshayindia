@@ -122,7 +122,7 @@ export default function VendorPlayPage() {
     setErr('')
     setMsg('')
     try {
-      const data = await apiFetch('/api/plays', {
+      await apiFetch('/api/plays', {
         method: 'POST',
         body: {
           date,

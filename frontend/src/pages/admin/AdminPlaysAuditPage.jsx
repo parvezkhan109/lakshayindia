@@ -31,7 +31,12 @@ export default function AdminPlaysAuditPage() {
   const [date, setDate] = useState(toLocalIsoDate())
   const [hour, setHour] = useState(ALL)
   const [quizType, setQuizType] = useState(ALL)
-  const [vendorUserId, setVendorUserId] = useState('')
+  const [vendor, setVendor] = useState('')
+
+  const [deleteFrom, setDeleteFrom] = useState(toLocalIsoDate())
+  const [deleteTo, setDeleteTo] = useState(toLocalIsoDate())
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteMsg, setDeleteMsg] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -43,14 +48,15 @@ export default function AdminPlaysAuditPage() {
     if (date) p.set('date', date)
     if (hour !== ALL) p.set('hour', hour)
     if (quizType !== ALL) p.set('quizType', quizType)
-    if (vendorUserId.trim()) p.set('vendorUserId', vendorUserId.trim())
+    if (vendor.trim()) p.set('vendor', vendor.trim())
     p.set('limit', '200')
     p.set('offset', '0')
     return p
-  }, [date, hour, quizType, vendorUserId])
+  }, [date, hour, quizType, vendor])
 
   async function load() {
     setError('')
+    setDeleteMsg('')
     setLoading(true)
     try {
       const data = await apiFetch(`/api/plays/audit?${params.toString()}`)
@@ -62,6 +68,27 @@ export default function AdminPlaysAuditPage() {
       setTotal(0)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function onDeleteRange() {
+    setError('')
+    setDeleteMsg('')
+    const ok = window.confirm(`Delete all play logs from ${deleteFrom} to ${deleteTo}? This cannot be undone.`)
+    if (!ok) return
+
+    setDeleteBusy(true)
+    try {
+      const data = await apiFetch('/api/plays/audit/delete-range', {
+        method: 'POST',
+        body: { fromDate: deleteFrom, toDate: deleteTo },
+      })
+      setDeleteMsg(`Deleted ${data.deleted || 0} record(s).`)
+      await load()
+    } catch (e) {
+      setError(e.message || 'Failed to delete logs')
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -126,15 +153,38 @@ export default function AdminPlaysAuditPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Vendor ID</Label>
+              <Label>Vendor (ID or Username)</Label>
               <Input
                 className="bg-white/5 border-white/15"
-                placeholder="e.g. 12"
-                value={vendorUserId}
-                onChange={(e) => setVendorUserId(e.target.value)}
-                inputMode="numeric"
+                placeholder="e.g. 12 or rahul"
+                value={vendor}
+                onChange={(e) => setVendor(e.target.value)}
               />
             </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold">Delete Logs by Date</div>
+                <div className="text-xs text-zinc-400">Deletes play audit logs (plays) for slots in the selected date range.</div>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-2">
+                  <Label>From</Label>
+                  <Input type="date" className="bg-white/5 border-white/15" value={deleteFrom} onChange={(e) => setDeleteFrom(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>To</Label>
+                  <Input type="date" className="bg-white/5 border-white/15" value={deleteTo} onChange={(e) => setDeleteTo(e.target.value)} />
+                </div>
+                <Button variant="destructive" onClick={onDeleteRange} disabled={deleteBusy || loading}>
+                  {deleteBusy ? 'Deleting…' : 'Delete Logs'}
+                </Button>
+              </div>
+            </div>
+
+            {deleteMsg ? <div className="mt-3 text-sm text-emerald-200">{deleteMsg}</div> : null}
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-3">

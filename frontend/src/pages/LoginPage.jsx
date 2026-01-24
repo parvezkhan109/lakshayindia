@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+
+import { ArrowLeft } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -26,7 +28,7 @@ function roleHome(role) {
 export default function LoginPage() {
   const nav = useNavigate()
 
-  const [role, setRole] = useState('VENDOR')
+  const [role, setRole] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -218,6 +220,21 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/45 to-black/80" />
       </div>
 
+      <div className="relative z-10 mx-auto max-w-7xl px-4 pt-6">
+        <Button
+          asChild
+          variant="secondary"
+          className="inline-flex border border-white/15 bg-white/5 hover:bg-white/10"
+        >
+          <Link to="/" aria-label="Back to Home">
+            <span className="inline-flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </span>
+          </Link>
+        </Button>
+      </div>
+
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center justify-center px-4 py-10">
         <div className="w-full max-w-5xl">
           <div className="grid gap-6 md:grid-cols-2 md:gap-0">
@@ -270,7 +287,7 @@ export default function LoginPage() {
                 <form onSubmit={onSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label>Role</Label>
-                    <Select value={role} onValueChange={setRole}>
+                    <Select value={role || undefined} onValueChange={setRole}>
                       <SelectTrigger className="bg-white/5 border-white/15">
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>

@@ -2,6 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { getSession } from '@/services/session'
 import LandingPage from '@/pages/LandingPage'
+import AboutPage from '@/pages/AboutPage'
+import GamesPage from '@/pages/GamesPage'
+import RegisterPage from '@/pages/RegisterPage'
+import ContactPage from '@/pages/ContactPage'
 import LoginPage from '@/pages/LoginPage'
 import PublicResultsPage from '@/pages/PublicResultsPage'
 import DashboardLayout from '@/layouts/DashboardLayout'
@@ -13,6 +17,7 @@ import AdminStoryManualPage from '@/pages/admin/AdminStoryManualPage'
 import AdminResultPublishPage from '@/pages/admin/AdminResultPublishPage'
 import AdminAssignVendorsPage from '@/pages/admin/AdminAssignVendorsPage'
 import AdminPlaysAuditPage from '@/pages/admin/AdminPlaysAuditPage'
+import AdminQueriesPage from '@/pages/admin/AdminQueriesPage'
 import SuperDashboard from '@/pages/super/SuperDashboard'
 import SuperVendorsPage from '@/pages/super/SuperVendorsPage'
 import SuperPlayPage from '@/pages/super/SuperPlayPage'
@@ -33,6 +38,10 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/games" element={<GamesPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/results" element={<PublicResultsPage />} />
 
@@ -52,6 +61,7 @@ export default function App() {
           <Route path="results/publish" element={<AdminResultPublishPage />} />
           <Route path="assignments" element={<AdminAssignVendorsPage />} />
           <Route path="plays/audit" element={<AdminPlaysAuditPage />} />
+          <Route path="queries" element={<AdminQueriesPage />} />
         </Route>
 
         <Route

@@ -86,7 +86,7 @@ export default function SuperPlayPage() {
     setErr('')
     setMsg('')
     try {
-      const data = await apiFetch('/api/plays', {
+      await apiFetch('/api/plays', {
         method: 'POST',
         body: {
           vendorUserId: Number(vendorUserId),

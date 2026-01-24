@@ -13,6 +13,8 @@ const storyRoutes = require('./src/stories/routes');
 const playRoutes = require('./src/plays/routes');
 const resultRoutes = require('./src/results/routes');
 const publicResultRoutes = require('./src/results/publicRoutes');
+const publicQueryRoutes = require('./src/queries/publicRoutes');
+const queryRoutes = require('./src/queries/routes');
 const assignmentRoutes = require('./src/assignments/routes');
 const { ensureAutoStoriesForCurrentIndiaSlot } = require('./src/stories/autoFill');
 
@@ -64,6 +66,8 @@ async function main() {
   app.use('/api/plays', playRoutes);
   app.use('/api/results', resultRoutes);
   app.use('/api/public', publicResultRoutes);
+  app.use('/api/public', publicQueryRoutes);
+  app.use('/api/queries', queryRoutes);
   app.use('/api/assignments', assignmentRoutes);
 
   // Auto-fill stories for the current India slot.
