@@ -125,8 +125,13 @@ export default function VendorHistoryPage() {
   }, [date, hour, isCurrentSlot])
 
   const playsByQuiz = useMemo(() => {
-    const map = { SILVER: null, GOLD: null, DIAMOND: null }
-    for (const p of plays || []) map[p.quizType] = p
+    const map = { SILVER: [], GOLD: [], DIAMOND: [] }
+    for (const p of plays || []) {
+      if (map[p.quizType]) map[p.quizType].push(p)
+    }
+    for (const qt of ['SILVER', 'GOLD', 'DIAMOND']) {
+      map[qt].sort((a, b) => Number(a.selectedNumber) - Number(b.selectedNumber))
+    }
     return map
   }, [plays])
 
@@ -195,6 +200,11 @@ export default function VendorHistoryPage() {
               const q = (quizzes || []).find((x) => x.quizType === qt) || null
               const mine = playsByQuiz[qt]
               const result = resultRow ? resultRow[qt] : null
+              const winNum = result ? Number(result.winningNumber) : null
+              const didWin =
+                result &&
+                Number.isInteger(winNum) &&
+                (mine || []).some((row) => Number(row.selectedNumber) === winNum)
 
               return (
                 <div key={qt} className="rounded-2xl bg-zinc-950/55 ring-1 ring-white/10 p-4">
@@ -213,11 +223,23 @@ export default function VendorHistoryPage() {
                   <div className="mt-3 grid gap-3">
                     <div className="rounded-xl bg-white/5 ring-1 ring-white/10 p-3">
                       <div className="text-xs text-zinc-400">Your Play</div>
-                      {mine ? (
-                        <div className="mt-1 text-sm text-zinc-200">
-                          #{mine.selectedNumber} — {mine.selectedTitle || 'Title unavailable'}
-                          <div className="mt-1 text-xs text-zinc-400">
-                            Tickets: {mine.tickets} • Played at: {mine.createdAt}
+                      {mine && mine.length > 0 ? (
+                        <div className="mt-2 max-h-56 overflow-y-auto pr-1 scroll-smooth overscroll-contain space-y-2 text-sm text-zinc-200">
+                          {mine.map((row) => (
+                            <div
+                              key={`${qt}-${row.selectedNumber}`}
+                              className="rounded-lg bg-zinc-950/35 ring-1 ring-white/5 px-2 py-1.5 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between"
+                            >
+                              <div className="min-w-0 break-words whitespace-normal text-zinc-200">
+                                <span className="text-zinc-400">#{row.selectedNumber}</span>{' '}
+                                <span className="text-zinc-600">—</span>{' '}
+                                <span className="text-zinc-200">{row.selectedTitle || 'Title unavailable'}</span>
+                              </div>
+                              <div className="shrink-0 text-xs text-zinc-400 sm:text-right">Tickets: {row.tickets}</div>
+                            </div>
+                          ))}
+                          <div className="pt-1 text-xs text-zinc-500">
+                            Last updated: {mine[mine.length - 1]?.lastCreatedAt || mine[mine.length - 1]?.createdAt || '—'}
                           </div>
                         </div>
                       ) : (
@@ -229,6 +251,11 @@ export default function VendorHistoryPage() {
                       <div className="text-xs text-zinc-400">Result</div>
                       {result ? (
                         <>
+                          {didWin ? (
+                            <div className="mt-2 inline-flex items-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/20 px-2 py-1 text-xs text-emerald-200">
+                              You won in {qt}
+                            </div>
+                          ) : null}
                           <ResultCell v={result} />
                           <div className="mt-1 text-xs text-zinc-500">Published: {result.publishedAt || '—'}</div>
                         </>

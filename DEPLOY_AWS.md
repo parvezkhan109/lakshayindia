@@ -44,7 +44,28 @@ From your local machine:
 - `scp -r ./LuckIndia ubuntu@<ElasticIP>:/home/ubuntu/app`
 
 Or use git:
-- `git clone <your-repo-url> /home/ubuntu/app`
+- `git clone https://github.com/lakshayindia28-rgb/lakshayindia.git /home/ubuntu/app`
+
+---
+
+## GitHub Actions (auto deploy on push)
+
+This repo includes a GitHub Actions workflow that SSHes into your EC2 instance and runs `/home/ubuntu/app/deploy.sh`.
+
+### Required repo secrets
+Add these in **GitHub → Settings → Secrets and variables → Actions → New repository secret**:
+
+- `EC2_HOST` — your server IP or DNS (Elastic IP recommended)
+- `EC2_USER` — usually `ubuntu`
+- `EC2_SSH_KEY` — the *private key* (contents of your `.pem` file)
+
+### Optional secrets
+- `EC2_PORT` — SSH port (default is `22`)
+
+### Notes
+- The EC2 user must be able to run `sudo` non-interactively (no password prompt), because `deploy.sh` uses `sudo` for nginx + file copy.
+- The server must already have the repo cloned at `/home/ubuntu/app`.
+- The workflow sets `REPO_URL=https://github.com/lakshayindia28-rgb/lakshayindia.git` so the server pulls from the new GitHub account.
 
 ### 4) Server install (run on EC2)
 SSH:

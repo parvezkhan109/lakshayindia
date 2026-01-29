@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS plays (
   FOREIGN KEY(vendor_user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY(slot_id) REFERENCES slots(id) ON DELETE CASCADE,
-  UNIQUE(vendor_user_id, slot_id, quiz_type)
+  UNIQUE(vendor_user_id, slot_id, quiz_type, selected_number)
 );
 CREATE INDEX IF NOT EXISTS idx_plays_vendor_slot ON plays(vendor_user_id, slot_id);
 CREATE INDEX IF NOT EXISTS idx_plays_slot_quiz ON plays(slot_id, quiz_type);

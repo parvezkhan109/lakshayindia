@@ -28,3 +28,6 @@ Seeded admin user:
    - `npm run dev`
 
 Frontend calls the backend via a Vite dev proxy on `/api` (to `http://localhost:4000`).
+
+## Deployment
+See [DEPLOY_AWS.md](DEPLOY_AWS.md) for EC2 + Nginx steps and the required GitHub Actions secrets (`EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/home/ubuntu/app"
+APP_DIR="${APP_DIR:-/home/ubuntu/app}"
+REPO_URL="${REPO_URL:-}"
 
 if [[ ! -d "$APP_DIR" ]]; then
   echo "ERROR: $APP_DIR not found. Clone repo there first." >&2
@@ -9,6 +10,11 @@ if [[ ! -d "$APP_DIR" ]]; then
 fi
 
 cd "$APP_DIR"
+
+if [[ -n "$REPO_URL" ]]; then
+  echo "==> Ensuring git remote origin matches REPO_URL"
+  git remote set-url origin "$REPO_URL"
+fi
 
 echo "==> Pulling latest code"
 git pull

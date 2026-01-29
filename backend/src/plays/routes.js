@@ -30,6 +30,65 @@ function assertAssigned(db, superUserId, vendorUserId) {
   }
 }
 
+function isPositiveInt(n) {
+  return Number.isInteger(n) && n > 0;
+}
+
+function currentIndiaSlot() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  const yyyy = get('year');
+  const mm = get('month');
+  const dd = get('day');
+  const hh = get('hour');
+
+  return { date: `${yyyy}-${mm}-${dd}`, hour: Number(hh) };
+}
+
+function assertVendorIsCurrentSlot(slotDate, slotHour) {
+  const now = currentIndiaSlot();
+  if (String(slotDate) !== String(now.date) || Number(slotHour) !== Number(now.hour)) {
+    const err = new Error('SLOT CLOSED');
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
+function assertCanPlaySlotQuiz(db, slotId, quizType) {
+  const published = db
+    .prepare('SELECT 1 AS ok FROM results WHERE slot_id = ? AND quiz_type = ? LIMIT 1')
+    .get(slotId, quizType);
+  if (published) {
+    const err = new Error('SLOT CLOSED: result already published');
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
+function upsertPlay(db, { vendorUserId, slotId, quizType, selectedNumber, tickets, priceEach, totalBet, createdByUserId }) {
+  // If the vendor adds tickets again for the same number, we increment tickets + total_bet.
+  db.prepare(
+    `INSERT INTO plays
+     (vendor_user_id, slot_id, quiz_type, selected_number, tickets, price_each, total_bet, created_by_user_id, created_at)
+     VALUES
+     (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+     ON CONFLICT(vendor_user_id, slot_id, quiz_type, selected_number)
+     DO UPDATE SET
+       tickets = plays.tickets + excluded.tickets,
+       total_bet = plays.total_bet + excluded.total_bet,
+       price_each = excluded.price_each,
+       created_by_user_id = excluded.created_by_user_id`
+  ).run(vendorUserId, slotId, quizType, selectedNumber, tickets, priceEach, totalBet, createdByUserId);
+}
+
 router.post('/', requireAuth, (req, res) => {
   const { vendorUserId, date, hour, quizType, selectedNumber, tickets } = req.body || {};
 
@@ -58,6 +117,11 @@ router.post('/', requireAuth, (req, res) => {
   let targetVendorId;
   if (req.user.role === 'VENDOR') {
     targetVendorId = req.user.id;
+    try {
+      assertVendorIsCurrentSlot(date, Number(hour));
+    } catch (e) {
+      return res.status(e.statusCode || 409).json({ ok: false, error: e.message });
+    }
   } else {
     targetVendorId = Number(vendorUserId);
     if (!targetVendorId) return res.status(400).json({ ok: false, error: 'vendorUserId required' });
@@ -78,33 +142,130 @@ router.post('/', requireAuth, (req, res) => {
 
   const slot = ensureSlot(date, Number(hour));
 
-  // If any result has been published for this slot, the slot is closed.
-  const published = db.prepare('SELECT 1 AS ok FROM results WHERE slot_id = ? LIMIT 1').get(slot.id);
-  if (published) {
-    return res.status(409).json({ ok: false, error: 'SLOT CLOSED: result already published' });
+  try {
+    assertCanPlaySlotQuiz(db, slot.id, qt);
+  } catch (e) {
+    return res.status(e.statusCode || 409).json({ ok: false, error: e.message });
   }
 
   const prices = getCurrentPrices(db);
   const priceEach = prices[qt];
   const totalBet = priceEach * tk;
 
-  try {
-    const info = db
-      .prepare(
-        `INSERT INTO plays
-         (vendor_user_id, slot_id, quiz_type, selected_number, tickets, price_each, total_bet, created_by_user_id, created_at)
-         VALUES
-         (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))`
-      )
-      .run(targetVendorId, slot.id, qt, sn, tk, priceEach, totalBet, req.user.id);
+  upsertPlay(db, {
+    vendorUserId: targetVendorId,
+    slotId: slot.id,
+    quizType: qt,
+    selectedNumber: sn,
+    tickets: tk,
+    priceEach,
+    totalBet,
+    createdByUserId: req.user.id,
+  });
 
-    res.status(201).json({ ok: true, playId: info.lastInsertRowid });
+  res.status(201).json({ ok: true });
+});
+
+// VENDOR/SUPER/ADMIN: bulk add tickets (multiple numbers, multiple quizzes) for a slot
+// Body: { date: 'YYYY-MM-DD', hour: 0-23, vendorUserId?: number, plays: [{ quizType, selectedNumber, tickets }] }
+router.post('/bulk', requireAuth, (req, res) => {
+  const { vendorUserId, date, hour, plays } = req.body || {};
+
+  try {
+    assertDate(date);
+    assertHour(Number(hour));
   } catch (e) {
-    if (e && e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ ok: false, error: 'LOCKED: quiz already played for this slot' });
-    }
-    throw e;
+    return res.status(400).json({ ok: false, error: e.message });
   }
+
+  if (!Array.isArray(plays) || plays.length === 0) {
+    return res.status(400).json({ ok: false, error: 'plays array required' });
+  }
+  if (plays.length > 60) {
+    return res.status(400).json({ ok: false, error: 'Too many items (max 60)' });
+  }
+
+  const db = getDb();
+
+  let targetVendorId;
+  if (req.user.role === 'VENDOR') {
+    targetVendorId = req.user.id;
+    try {
+      assertVendorIsCurrentSlot(date, Number(hour));
+    } catch (e) {
+      return res.status(e.statusCode || 409).json({ ok: false, error: e.message });
+    }
+  } else {
+    targetVendorId = Number(vendorUserId);
+    if (!targetVendorId) return res.status(400).json({ ok: false, error: 'vendorUserId required' });
+
+    const vendor = db.prepare('SELECT id, role FROM users WHERE id = ?').get(targetVendorId);
+    if (!vendor || vendor.role !== 'VENDOR') {
+      return res.status(400).json({ ok: false, error: 'vendorUserId must be a VENDOR' });
+    }
+
+    if (req.user.role === 'SUPER') {
+      try {
+        assertAssigned(db, req.user.id, targetVendorId);
+      } catch (e) {
+        return res.status(e.statusCode || 403).json({ ok: false, error: e.message });
+      }
+    }
+  }
+
+  const parsed = [];
+  for (const item of plays) {
+    const qt = normalizeQuizType(item?.quizType);
+    if (!qt) return res.status(400).json({ ok: false, error: 'Invalid quizType in plays' });
+
+    const sn = Number(item?.selectedNumber);
+    if (!Number.isInteger(sn) || sn < 0 || sn > 9) {
+      return res.status(400).json({ ok: false, error: 'selectedNumber must be 0-9' });
+    }
+
+    const tk = Number(item?.tickets);
+    if (!isPositiveInt(tk)) {
+      return res.status(400).json({ ok: false, error: 'tickets must be a positive integer' });
+    }
+
+    parsed.push({ quizType: qt, selectedNumber: sn, tickets: tk });
+  }
+
+  const slot = ensureSlot(date, Number(hour));
+
+  // Pre-check closed quizzes
+  const closed = [];
+  for (const p of parsed) {
+    const published = db
+      .prepare('SELECT 1 AS ok FROM results WHERE slot_id = ? AND quiz_type = ? LIMIT 1')
+      .get(slot.id, p.quizType);
+    if (published) closed.push(p.quizType);
+  }
+  if (closed.length > 0) {
+    return res.status(409).json({ ok: false, error: 'SLOT CLOSED: result already published', closed: Array.from(new Set(closed)) });
+  }
+
+  const prices = getCurrentPrices(db);
+
+  const tx = db.transaction(() => {
+    for (const p of parsed) {
+      const priceEach = prices[p.quizType];
+      const totalBet = priceEach * p.tickets;
+      upsertPlay(db, {
+        vendorUserId: targetVendorId,
+        slotId: slot.id,
+        quizType: p.quizType,
+        selectedNumber: p.selectedNumber,
+        tickets: p.tickets,
+        priceEach,
+        totalBet,
+        createdByUserId: req.user.id,
+      });
+    }
+  });
+
+  tx();
+  res.status(201).json({ ok: true, added: parsed.length });
 });
 
 router.get('/lock-status', requireAuth, (req, res) => {
@@ -141,18 +302,13 @@ router.get('/lock-status', requireAuth, (req, res) => {
 
   if (!slot) return res.json({ ok: true, locked: { SILVER: false, GOLD: false, DIAMOND: false } });
 
-  // If any result has been published for this slot, treat all quizzes as locked.
-  const published = db.prepare('SELECT 1 AS ok FROM results WHERE slot_id = ? LIMIT 1').get(slot.id);
-  if (published) {
-    return res.json({ ok: true, locked: { SILVER: true, GOLD: true, DIAMOND: true } });
-  }
-
-  const rows = db
-    .prepare('SELECT quiz_type FROM plays WHERE vendor_user_id = ? AND slot_id = ?')
-    .all(targetVendorId, slot.id);
+  // Lock only quizzes whose results are published.
+  const published = db
+    .prepare("SELECT quiz_type FROM results WHERE slot_id = ? AND quiz_type IN ('SILVER','GOLD','DIAMOND')")
+    .all(slot.id);
 
   const locked = { SILVER: false, GOLD: false, DIAMOND: false };
-  for (const r of rows) locked[r.quiz_type] = true;
+  for (const r of published) locked[r.quiz_type] = true;
 
   res.json({ ok: true, locked });
 });
@@ -202,19 +358,20 @@ router.get('/mine', requireAuth, (req, res) => {
   const rows = db
     .prepare(
       `SELECT
-         p.id,
          p.quiz_type AS quizType,
          p.selected_number AS selectedNumber,
          st.title AS selectedTitle,
-         p.tickets AS tickets,
-         p.price_each AS priceEach,
-         p.total_bet AS totalBet,
-         p.created_at AS createdAt
+         SUM(p.tickets) AS tickets,
+         MAX(p.price_each) AS priceEach,
+         SUM(p.total_bet) AS totalBet,
+         MIN(p.created_at) AS firstCreatedAt,
+         MAX(p.created_at) AS lastCreatedAt
        FROM plays p
        LEFT JOIN stories s ON s.slot_id = p.slot_id AND s.quiz_type = p.quiz_type
        LEFT JOIN story_titles st ON st.story_id = s.id AND st.number = p.selected_number
        WHERE p.vendor_user_id = ? AND p.slot_id = ?
-       ORDER BY p.quiz_type`
+       GROUP BY p.quiz_type, p.selected_number
+       ORDER BY p.quiz_type, p.selected_number`
     )
     .all(targetVendorId, slot.id);
 

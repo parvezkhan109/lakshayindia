@@ -46,9 +46,17 @@ export default function VendorPlayPage() {
   const [hour, setHour] = useState(currentSlot().hour)
   const [quizzes, setQuizzes] = useState([])
   const [locked, setLocked] = useState({ SILVER: false, GOLD: false, DIAMOND: false })
-  const [tickets, setTickets] = useState({ SILVER: '1', GOLD: '1', DIAMOND: '1' })
-  const [pick, setPick] = useState({ SILVER: '0', GOLD: '0', DIAMOND: '0' })
-  const [myPlays, setMyPlays] = useState({ SILVER: null, GOLD: null, DIAMOND: null })
+  const [showAddTicket, setShowAddTicket] = useState(false)
+  const [ticketGrid, setTicketGrid] = useState({
+    SILVER: Array.from({ length: 10 }, () => ''),
+    GOLD: Array.from({ length: 10 }, () => ''),
+    DIAMOND: Array.from({ length: 10 }, () => ''),
+  })
+  const [myTickets, setMyTickets] = useState({
+    SILVER: Array.from({ length: 10 }, () => 0),
+    GOLD: Array.from({ length: 10 }, () => 0),
+    DIAMOND: Array.from({ length: 10 }, () => 0),
+  })
   const [playsApiMissing, setPlaysApiMissing] = useState(false)
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
@@ -99,9 +107,20 @@ export default function VendorPlayPage() {
         setQuizzes(stories?.quizzes || [])
         setLocked(locks?.locked || { SILVER: false, GOLD: false, DIAMOND: false })
 
-        const byQuiz = { SILVER: null, GOLD: null, DIAMOND: null }
-        for (const row of mine?.rows || []) byQuiz[row.quizType] = row
-        setMyPlays(byQuiz)
+        const nextMy = {
+          SILVER: Array.from({ length: 10 }, () => 0),
+          GOLD: Array.from({ length: 10 }, () => 0),
+          DIAMOND: Array.from({ length: 10 }, () => 0),
+        }
+        for (const row of mine?.rows || []) {
+          const qt = row.quizType
+          const n = Number(row.selectedNumber)
+          const tk = Number(row.tickets || 0)
+          if (!nextMy[qt]) continue
+          if (!Number.isInteger(n) || n < 0 || n > 9) continue
+          nextMy[qt][n] = tk
+        }
+        setMyTickets(nextMy)
 
         if (results[2].status === 'rejected') {
           const status = results[2].reason?.status
@@ -118,49 +137,62 @@ export default function VendorPlayPage() {
     }
   }, [slotKey, refreshSeq])
 
-  async function play(quizType) {
+  async function submitQuiz(qt) {
     setErr('')
     setMsg('')
+
+    const items = []
+    for (let i = 0; i < 10; i++) {
+      const raw = String(ticketGrid[qt]?.[i] ?? '').trim()
+      if (!raw) continue
+      const tk = Number(raw)
+      if (!Number.isInteger(tk) || tk <= 0) {
+        setErr(`${qt}: tickets must be a positive integer (number ${i})`)
+        return
+      }
+      items.push({ quizType: qt, selectedNumber: i, tickets: tk })
+    }
+
+    if (items.length === 0) {
+      setErr(`${qt}: add at least 1 ticket in any box.`)
+      return
+    }
+
     try {
-      await apiFetch('/api/plays', {
+      await apiFetch('/api/plays/bulk', {
         method: 'POST',
         body: {
           date,
           hour: Number(hour),
-          quizType,
-          selectedNumber: Number(pick[quizType]),
-          tickets: Number(tickets[quizType]),
+          plays: items,
         },
       })
-      setMsg(`${quizType}: submitted`)
 
-      // Optimistic UI: show what user just played immediately.
-      const q = quizzes.find((x) => x.quizType === quizType)
-      const selectedNumber = Number(pick[quizType])
-      const selectedTitle = q?.titles?.[selectedNumber] || null
-      setMyPlays((prev) => ({
+      setMsg(`${qt}: tickets added (${items.length} selection(s))`)
+
+      // Clear inputs for this quiz (inputs represent "add more")
+      setTicketGrid((prev) => ({
         ...prev,
-        [quizType]: {
-          quizType,
-          selectedNumber,
-          selectedTitle,
-          tickets: Number(tickets[quizType]),
-          createdAt: new Date().toISOString(),
-        },
+        [qt]: Array.from({ length: 10 }, () => ''),
       }))
 
-      const locks = await apiFetch(`/api/plays/lock-status?date=${encodeURIComponent(date)}&hour=${encodeURIComponent(hour)}`)
-      setLocked(locks.locked)
+      // Trigger refresh to show updated totals
+      setRefreshSeq((s) => s + 1)
     } catch (e) {
+      if (e?.status === 409) {
+        const closed = e?.data?.closed
+        const isThisClosed = Array.isArray(closed) ? closed.includes(qt) : true
+        if (isThisClosed) {
+          setLocked((prev) => ({ ...prev, [qt]: true }))
+        }
+      }
       setErr(e.message)
     }
   }
 
-  function quizPanel(qt) {
+  function quizPanelDisplayOnly(qt) {
     const q = quizzes.find((x) => x.quizType === qt)
     const isLocked = !!locked[qt]
-    const selected = Number(pick[qt])
-    const mine = myPlays[qt]
 
     return (
       <div key={qt} className="h-full rounded-2xl bg-zinc-950/55 ring-1 ring-white/10 backdrop-blur">
@@ -189,73 +221,130 @@ export default function VendorPlayPage() {
                 </div>
               </div>
 
-              {mine ? (
-                <div className="rounded-xl bg-emerald-500/5 ring-1 ring-emerald-400/15 p-3">
-                  <div className="text-xs text-emerald-200">Your last play</div>
-                  <div className="mt-1 text-sm text-zinc-100">
-                    #{mine.selectedNumber} — {mine.selectedTitle || 'Title unavailable'}
-                  </div>
-                  <div className="mt-1 text-xs text-zinc-400">Tickets: {mine.tickets} • {mine.createdAt}</div>
-                </div>
-              ) : playsApiMissing ? (
+              {playsApiMissing ? (
                 <div className="rounded-xl bg-amber-500/10 ring-1 ring-amber-400/20 p-3">
                   <div className="text-xs text-amber-200">Your play history not available</div>
                   <div className="mt-1 text-sm text-amber-100">Restart backend once to enable it.</div>
                 </div>
               ) : null}
 
-              <div className="text-xs text-zinc-400">Pick a title</div>
-              <div className="max-h-[320px] overflow-y-auto pr-1 scroll-smooth overscroll-contain">
-                <div className="grid gap-2 md:grid-cols-2">
+              <div className="text-xs text-zinc-400">Titles (0-9)</div>
+              <div className="mt-2 max-h-[420px] overflow-y-auto pr-1 scroll-smooth overscroll-contain">
+                <div className="space-y-2">
                   {q.titles.map((t, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setPick((p) => ({ ...p, [qt]: String(i) }))}
-                      className={
-                        i === selected
-                          ? 'rounded-lg bg-amber-500/15 ring-1 ring-amber-400/40 px-3 py-2 text-left text-sm transition'
-                          : 'rounded-lg bg-white/5 ring-1 ring-white/10 hover:bg-white/10 hover:ring-white/20 px-3 py-2 text-left text-sm transition'
-                      }
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-xs text-zinc-400">{i}</div>
-                        {i === selected ? <div className="text-[10px] font-semibold text-amber-200">SELECTED</div> : null}
-                      </div>
-                      <div className="text-zinc-200">{t}</div>
-                      <div className="mt-1 text-[11px] text-zinc-400">Tap title to place tickets</div>
-                    </button>
+                    <div key={i} className="rounded-xl bg-white/5 ring-1 ring-white/10 px-3 py-2">
+                      <div className="text-xs text-zinc-400">{i}</div>
+                      <div className="text-sm text-zinc-200">{t}</div>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-2 rounded-xl bg-white/5 ring-1 ring-white/10 p-3">
-                <div className="text-xs text-zinc-400">Selected</div>
-                <div className="mt-1 text-sm text-zinc-200">
-                  #{selected} — {q.titles[selected] || '—'}
-                </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-3 items-end">
-                  <div className="space-y-2">
-                    <div className="text-xs text-zinc-400">Tickets</div>
-                    <Input
-                      className="bg-zinc-950/40"
-                      value={tickets[qt]}
-                      onChange={(e) => setTickets((p) => ({ ...p, [qt]: e.target.value }))}
-                    />
-                  </div>
-                  <div className="md:col-span-2 flex items-center gap-3">
-                    <Button disabled={isLocked} onClick={() => play(qt)}>
-                      Place Tickets
-                    </Button>
-                    <div className="text-xs text-zinc-500">Pick by clicking a title above</div>
-                  </div>
-                </div>
-              </div>
+              {isLocked ? (
+                <div className="text-xs text-amber-200">Result published: {qt} is locked.</div>
+              ) : (
+                <div className="text-xs text-zinc-500">Use “Add Ticket” to play.</div>
+              )}
             </>
           )}
         </div>
       </div>
+    )
+  }
+
+  function addTicketPanel() {
+    return (
+      <Card className="bg-zinc-950/55 ring-1 ring-white/12 backdrop-blur">
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm text-zinc-300 font-medium">Add Ticket</div>
+              <div className="text-xs text-zinc-500">Enter tickets for 0-9 numbers, then click Play for each quiz.</div>
+            </div>
+            <Button variant="secondary" onClick={() => setShowAddTicket(false)}>
+              Close
+            </Button>
+          </div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-3 items-stretch">
+            {['SILVER', 'GOLD', 'DIAMOND'].map((qt) => {
+              const isLocked = !!locked[qt]
+              const grid = ticketGrid[qt]
+              const already = myTickets[qt]
+
+              return (
+                <div key={`add-${qt}`} className="h-full rounded-2xl bg-zinc-950/55 ring-1 ring-white/10">
+                  <div className="p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-base font-semibold">{qt}</div>
+                      <div
+                        className={
+                          isLocked
+                            ? 'text-xs text-amber-200 rounded-full bg-amber-500/10 ring-1 ring-amber-400/20 px-2 py-1'
+                            : 'text-xs text-emerald-200 rounded-full bg-emerald-500/10 ring-1 ring-emerald-400/20 px-2 py-1'
+                        }
+                      >
+                        {isLocked ? 'LOCKED' : 'OPEN'}
+                      </div>
+                    </div>
+
+                    <>
+                      <div className="text-xs text-zinc-400">0-9 Numbers</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {Array.from({ length: 10 }, (_, i) => i).map((i) => (
+                          <div
+                            key={`${qt}-${i}`}
+                            className="rounded-xl bg-white/5 ring-1 ring-white/10 px-2 py-1.5"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-xs text-zinc-200 font-semibold w-4">{i}</div>
+                              <Input
+                                type="number"
+                                min={0}
+                                inputMode="numeric"
+                                className="h-7 bg-zinc-950/40 px-2 text-sm"
+                                value={grid?.[i] ?? ''}
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                  setTicketGrid((prev) => {
+                                    const next = { ...prev }
+                                    next[qt] = [...next[qt]]
+                                    next[qt][i] = v
+                                    return next
+                                  })
+                                }}
+                                disabled={isLocked}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <Button disabled={isLocked} onClick={() => submitQuiz(qt)}>
+                            {isLocked ? 'LOCKED' : `Play (${qt})`}
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            disabled={isLocked}
+                            onClick={() =>
+                              setTicketGrid((prev) => ({
+                                ...prev,
+                                [qt]: Array.from({ length: 10 }, () => ''),
+                              }))
+                            }
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                    </>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
     )
   }
 
@@ -284,12 +373,18 @@ export default function VendorPlayPage() {
                 <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
                   <div className="rounded-md bg-white/5 px-3 py-2 text-sm text-zinc-200">{date}</div>
                   <div className="rounded-md bg-white/5 px-3 py-2 text-sm text-zinc-200">{formatSlotLabel(hour)}</div>
+                  <Button
+                    variant="secondary"
+                    className="pointer-events-auto"
+                    onClick={() => setShowAddTicket((v) => !v)}
+                  >
+                    {showAddTicket ? 'Hide Add Ticket' : 'Add Ticket'}
+                  </Button>
                 </div>
               </div>
             </div>
 
             <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-xs text-zinc-500">Vendor can play only the current running slot.</div>
               <div className="text-xs text-zinc-600">Key: {slotKey}</div>
             </div>
 
@@ -299,14 +394,18 @@ export default function VendorPlayPage() {
         </Card>
       </div>
 
-      <Card className="bg-zinc-950/55 ring-1 ring-white/12 backdrop-blur">
-        <CardContent className="p-4">
-          <div className="text-sm text-zinc-300 font-medium">Stories & Picks</div>
-          <div className="mt-3 grid gap-4 lg:grid-cols-3 items-stretch">
-            {['SILVER', 'GOLD', 'DIAMOND'].map((qt) => quizPanel(qt))}
-          </div>
-        </CardContent>
-      </Card>
+      {showAddTicket ? addTicketPanel() : null}
+
+      {!showAddTicket ? (
+        <Card className="bg-zinc-950/55 ring-1 ring-white/12 backdrop-blur">
+          <CardContent className="p-4">
+            <div className="text-sm text-zinc-300 font-medium">Stories & Picks</div>
+            <div className="mt-3 grid gap-4 lg:grid-cols-3 items-stretch">
+              {['SILVER', 'GOLD', 'DIAMOND'].map((qt) => quizPanelDisplayOnly(qt))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

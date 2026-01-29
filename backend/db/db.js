@@ -19,6 +19,77 @@ function migrate(schemaSql) {
   db.exec(schemaSql);
 }
 
+function getIndexColumns(indexName) {
+  try {
+    return db.prepare(`PRAGMA index_info(${JSON.stringify(indexName)})`).all().map((r) => r.name);
+  } catch {
+    return [];
+  }
+}
+
+function migratePlaysUniqueConstraint() {
+  // Older DBs had: UNIQUE(vendor_user_id, slot_id, quiz_type)
+  // New schema requires: UNIQUE(vendor_user_id, slot_id, quiz_type, selected_number)
+  // SQLite can't alter constraints in-place; rebuild table if needed.
+  try {
+    const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='plays'").get();
+    if (!table) return;
+
+    const indexes = db.prepare("PRAGMA index_list('plays')").all();
+    const uniqueIndexes = indexes.filter((i) => i.unique);
+    const hasOldUnique = uniqueIndexes.some((i) => {
+      const cols = getIndexColumns(i.name);
+      return cols.join(',') === 'vendor_user_id,slot_id,quiz_type';
+    });
+
+    if (!hasOldUnique) return;
+
+    db.exec('BEGIN');
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS plays_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vendor_user_id INTEGER NOT NULL,
+        slot_id INTEGER NOT NULL,
+        quiz_type TEXT NOT NULL CHECK (quiz_type IN ('SILVER','GOLD','DIAMOND')),
+        selected_number INTEGER NOT NULL CHECK (selected_number BETWEEN 0 AND 9),
+        tickets INTEGER NOT NULL CHECK (tickets > 0),
+        price_each INTEGER NOT NULL CHECK (price_each > 0),
+        total_bet INTEGER NOT NULL CHECK (total_bet > 0),
+        created_by_user_id INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(vendor_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(created_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(slot_id) REFERENCES slots(id) ON DELETE CASCADE,
+        UNIQUE(vendor_user_id, slot_id, quiz_type, selected_number)
+      );
+    `);
+
+    db.exec(`
+      INSERT INTO plays_new
+      (id, vendor_user_id, slot_id, quiz_type, selected_number, tickets, price_each, total_bet, created_by_user_id, created_at)
+      SELECT id, vendor_user_id, slot_id, quiz_type, selected_number, tickets, price_each, total_bet, created_by_user_id, created_at
+      FROM plays;
+    `);
+
+    db.exec('DROP TABLE plays');
+    db.exec('ALTER TABLE plays_new RENAME TO plays');
+
+    db.exec("CREATE INDEX IF NOT EXISTS idx_plays_vendor_slot ON plays(vendor_user_id, slot_id)");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_plays_slot_quiz ON plays(slot_id, quiz_type)");
+
+    db.exec('COMMIT');
+    console.log('[db] migrated plays unique constraint to include selected_number');
+  } catch (e) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // ignore
+    }
+    console.warn('[db] plays migration skipped/failed:', e.message);
+  }
+}
+
 function initDb() {
   if (db) return db;
 
@@ -34,6 +105,7 @@ function initDb() {
   db.pragma('busy_timeout = 5000');
 
   migrate(require('./schema'));
+  migratePlaysUniqueConstraint();
   seedIfEmpty();
 
   return db;
