@@ -34,6 +34,7 @@ export default function AdminResultPublishPage() {
   })
   const [busy, setBusy] = useState(false)
   const [editBusy, setEditBusy] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [slotInfo, setSlotInfo] = useState(null)
@@ -191,6 +192,29 @@ export default function AdminResultPublishPage() {
       setErr(e.message)
     } finally {
       setEditBusy(false)
+    }
+  }
+
+  async function onDeleteSlotResults() {
+    const ok = window.confirm(
+      `Delete published results for ${date} ${formatSlotLabel(hour)}?\n\nThis will remove SILVER/GOLD/DIAMOND results for this slot.`
+    )
+    if (!ok) return
+
+    setDeleteBusy(true)
+    setErr('')
+    setMsg('')
+    try {
+      const data = await apiFetch('/api/results/delete-batch', {
+        method: 'POST',
+        body: { date, hour: Number(hour) },
+      })
+      setMsg(`Deleted results for slot (${(data.deleted || []).join(', ') || '—'})`)
+      await loadMatrix()
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -352,17 +376,32 @@ export default function AdminResultPublishPage() {
             </table>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={onPublishAll} disabled={busy || storiesBusy || editBusy}>
-              {busy ? 'Saving…' : anyPublished(matrix) ? 'Publish / Update All' : 'Publish All'}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={onEditAll}
-              disabled={editBusy || storiesBusy || !anyPublished(matrix)}
-            >
-              {editBusy ? 'Updating…' : 'Edit'}
-            </Button>
+          <div className="grid gap-3 sm:grid-cols-2 sm:items-center">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={onPublishAll} disabled={busy || storiesBusy || editBusy || deleteBusy}>
+                {busy ? 'Saving…' : anyPublished(matrix) ? 'Publish / Update All' : 'Publish All'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={onEditAll}
+                disabled={editBusy || storiesBusy || deleteBusy || !anyPublished(matrix)}
+              >
+                {editBusy ? 'Updating…' : 'Edit'}
+              </Button>
+            </div>
+
+            {anyPublished(matrix) ? (
+              <div className="flex items-center justify-start sm:justify-end gap-3">
+                <div className="text-xs text-zinc-400">Delete Result</div>
+                <Button
+                  variant="destructive"
+                  onClick={onDeleteSlotResults}
+                  disabled={deleteBusy || busy || editBusy || storiesBusy}
+                >
+                  {deleteBusy ? 'Deleting…' : 'Delete'}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           {anyPublished(matrix) ? (

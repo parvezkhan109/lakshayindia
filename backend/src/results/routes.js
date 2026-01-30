@@ -348,6 +348,35 @@ router.put('/edit-batch', requireAuth, requireRole(['ADMIN', 'SUPER']), (req, re
   res.json({ ok: true, slotId: slot.id, updated });
 });
 
+// ADMIN/SUPER: delete results for a slot (all 3 quizzes)
+// body: { date, hour }
+router.post('/delete-batch', requireAuth, requireRole(['ADMIN', 'SUPER']), (req, res) => {
+  const { date, hour } = req.body || {};
+
+  try {
+    assertDate(date);
+    assertHour(Number(hour));
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+
+  const db = getDb();
+  const slot = ensureSlot(date, Number(hour));
+
+  const existing = db
+    .prepare("SELECT quiz_type AS quizType FROM results WHERE slot_id = ? AND quiz_type IN ('SILVER','GOLD','DIAMOND')")
+    .all(slot.id);
+
+  if (!existing || existing.length === 0) {
+    return res.status(404).json({ ok: false, error: 'No published result found for this slot' });
+  }
+
+  const del = db.prepare("DELETE FROM results WHERE slot_id = ? AND quiz_type IN ('SILVER','GOLD','DIAMOND')");
+  const info = del.run(slot.id);
+
+  res.json({ ok: true, slotId: slot.id, deletedCount: info.changes || 0, deleted: existing.map((r) => r.quizType) });
+});
+
 // Authenticated results for dashboards
 router.get('/by-date', requireAuth, (req, res) => {
   const { date } = req.query;

@@ -525,4 +525,33 @@ router.post('/audit/delete-range', requireAuth, requireRole('ADMIN'), (req, res)
   res.json({ ok: true, deleted });
 });
 
+// ADMIN/SUPER: delete tickets (plays) for a specific slot
+// Body: { date: 'YYYY-MM-DD', hour: 0-23, quizType?: 'SILVER'|'GOLD'|'DIAMOND' }
+router.post('/delete-slot', requireAuth, requireRole(['ADMIN', 'SUPER']), (req, res) => {
+  const date = String(req.body?.date || '').trim();
+  const hour = Number(req.body?.hour);
+  const qtRaw = req.body?.quizType;
+
+  try {
+    assertDate(date);
+    assertHour(Number(hour));
+  } catch (e) {
+    return res.status(400).json({ ok: false, error: e.message });
+  }
+
+  const quizType = qtRaw ? normalizeQuizType(qtRaw) : null;
+  if (qtRaw && !quizType) {
+    return res.status(400).json({ ok: false, error: 'Invalid quizType' });
+  }
+
+  const db = getDb();
+  const slot = ensureSlot(date, Number(hour));
+
+  const info = quizType
+    ? db.prepare('DELETE FROM plays WHERE slot_id = ? AND quiz_type = ?').run(slot.id, quizType)
+    : db.prepare("DELETE FROM plays WHERE slot_id = ? AND quiz_type IN ('SILVER','GOLD','DIAMOND')").run(slot.id);
+
+  res.json({ ok: true, slotId: slot.id, deleted: info.changes || 0, quizType: quizType || 'ALL' });
+});
+
 module.exports = router;
